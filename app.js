@@ -14,7 +14,7 @@ let currentQuiz = 0;
 let dragging = null;
 
 const nav = document.querySelector("#nav");
-const userSummary = document.querySelector("#user-summary");
+const menuToggle = document.querySelector("#menu-toggle");
 const pages = {
   notes: document.querySelector("#notes-page"),
   quiz: document.querySelector("#quiz-page"),
@@ -53,7 +53,10 @@ async function init() {
 
 function bindEvents() {
   window.addEventListener("hashchange", renderRoute);
+  menuToggle.addEventListener("click", toggleMenu);
   nav.addEventListener("click", navigateFromNav);
+  document.addEventListener("click", closeMenuFromOutside);
+  document.addEventListener("keydown", closeMenuWithEscape);
   noteForm.addEventListener("submit", addNote);
   addBoardButton.addEventListener("click", addBoard);
   prevBoardButton.addEventListener("click", () => moveBoard(-1));
@@ -74,9 +77,31 @@ function navigateFromNav(event) {
   const nextHash = link.getAttribute("href");
   if (location.hash === nextHash) {
     renderRoute();
+    setMenuOpen(false);
     return;
   }
   location.hash = nextHash;
+  setMenuOpen(false);
+}
+
+function toggleMenu() {
+  setMenuOpen(!nav.classList.contains("open"));
+}
+
+function setMenuOpen(isOpen) {
+  nav.classList.toggle("open", isOpen);
+  menuToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+function closeMenuFromOutside(event) {
+  if (event.target.closest(".menu-area")) return;
+  setMenuOpen(false);
+}
+
+function closeMenuWithEscape(event) {
+  if (event.key === "Escape") {
+    setMenuOpen(false);
+  }
 }
 
 async function getStoredSession() {
@@ -149,8 +174,11 @@ async function loadUserData() {
 function renderNav() {
   if (session) {
     const name = profile?.nickname || session.user.email;
-    userSummary.textContent = `${name}님`;
     nav.innerHTML = `
+      <div class="menu-profile">
+        <span>로그인 계정</span>
+        <strong>${escapeHtml(name)}님</strong>
+      </div>
       <a class="${navActive("notes")}" href="#notes">포스트잇</a>
       <a class="${navActive("quiz")}" href="#quiz">퀴즈</a>
       <a class="${navActive("docs")}" href="#docs">사용 설명서</a>
@@ -160,8 +188,11 @@ function renderNav() {
     return;
   }
 
-  userSummary.textContent = "";
   nav.innerHTML = `
+    <div class="menu-profile muted-profile">
+      <span>학습 공간</span>
+      <strong>로그인이 필요합니다</strong>
+    </div>
     <a class="${navActive("notes")}" href="#notes">포스트잇</a>
     <a class="${navActive("quiz")}" href="#quiz">퀴즈</a>
     <a class="${navActive("docs")}" href="#docs">사용 설명서</a>
@@ -287,6 +318,7 @@ function logout() {
   quizOrder = [];
   currentQuiz = 0;
   renderNav();
+  setMenuOpen(false);
   location.hash = "#login";
 }
 

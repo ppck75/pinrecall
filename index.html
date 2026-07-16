@@ -3,21 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Pinrecall</title>
-    <link rel="stylesheet" href="./styles.css?v=notetitle1" />
+    <title>📝Pinrecall</title>
+    <link rel="stylesheet" href="./styles.css?v=quiztitle1" />
   </head>
   <body>
     <header class="site-header">
       <div class="brand-area">
         <a class="logo" href="#notes">Pinrecall</a>
-        <span id="user-summary" class="user-summary" aria-live="polite"></span>
       </div>
-      <nav id="nav" aria-label="상단 메뉴">
-        <a href="#notes">포스트잇</a>
-        <a href="#quiz">퀴즈</a>
-        <a class="nav-login" href="#login">로그인</a>
-        <a href="#signup">회원가입</a>
-      </nav>
+      <div class="menu-area">
+        <button id="menu-toggle" class="menu-toggle" type="button" aria-expanded="false" aria-controls="nav">
+          메뉴
+        </button>
+        <nav id="nav" class="menu-panel" aria-label="상단 메뉴">
+          <a href="#notes">포스트잇</a>
+          <a href="#quiz">퀴즈</a>
+          <a class="nav-login" href="#login">로그인</a>
+          <a href="#signup">회원가입</a>
+        </nav>
+      </div>
     </header>
 
     <main>
@@ -50,7 +54,7 @@
         <div class="page-title">
           <div>
             <p>Quiz cards</p>
-            <h1>문제와 정답을 넣고 셔플해서 테스트하세요.</h1>
+            <h1>문제와 정답을 넣고<br />셔플해서 테스트하세요</h1>
           </div>
         </div>
 
@@ -145,6 +149,6 @@
       </section>
     </main>
 
-    <script src="./app.js?v=notetitle1"></script>
+    <script src="./app.js?v=quiztitle1"></script>
   </body>
 </html>
