@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>pinrecall</title>
+    <link rel="stylesheet" href="./styles.css?v=navlayout1" />
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="brand-area">
+        <a class="logo" href="#notes">pinrecall</a>
+        <span id="user-summary" class="user-summary" aria-live="polite"></span>
+      </div>
+      <nav id="nav" aria-label="상단 메뉴">
+        <a href="#notes">포스트잇</a>
+        <a href="#quiz">퀴즈</a>
+        <a class="nav-login" href="#login">로그인</a>
+        <a href="#signup">회원가입</a>
+      </nav>
+    </header>
+
+    <main>
+      <section id="notes-page" class="page">
+        <div class="page-title">
+          <div>
+            <p>Memo board</p>
+            <h1>복습할 내용을 포스트잇으로 붙여두세요.</h1>
+          </div>
+          <form id="note-form" class="quick-form">
+            <textarea id="note-text" maxlength="240" placeholder="예: adequate = 충분한" required></textarea>
+            <button type="submit">붙이기</button>
+          </form>
+        </div>
+        <div id="note-board" class="note-board" aria-label="포스트잇 메모 보드"></div>
+      </section>
+
+      <section id="quiz-page" class="page hidden">
+        <div class="page-title">
+          <div>
+            <p>Quiz cards</p>
+            <h1>문제와 정답을 넣고 셔플해서 테스트하세요.</h1>
+          </div>
+        </div>
+
+        <form id="quiz-form" class="quiz-form">
+          <input id="question-input" type="text" maxlength="300" placeholder="문제: abandon" required />
+          <input id="answer-input" type="text" maxlength="300" placeholder="정답: 버리다, 포기하다" required />
+          <button type="submit">등록</button>
+        </form>
+
+        <div class="quiz-box">
+          <div>
+            <span id="quiz-count">0 / 0</span>
+            <h2 id="quiz-question">등록한 문제가 없습니다.</h2>
+            <p id="quiz-answer" class="answer hidden"></p>
+          </div>
+          <div class="actions">
+            <button id="shuffle-btn" type="button">셔플</button>
+            <button id="show-answer-btn" type="button">정답 보기</button>
+            <button id="next-btn" type="button">다음</button>
+          </div>
+        </div>
+
+        <ul id="quiz-list" class="quiz-list"></ul>
+      </section>
+
+      <section id="login-page" class="page auth-page hidden">
+        <form id="login-form" class="auth-card">
+          <div>
+            <p>Login</p>
+            <h1>로그인</h1>
+          </div>
+          <label>
+            이메일 주소
+            <input id="login-email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            비밀번호
+            <input id="login-password" type="password" autocomplete="current-password" required />
+          </label>
+          <p id="login-message" class="message hidden"></p>
+          <button type="submit">로그인</button>
+          <p class="auth-link">계정이 없으신가요? <a href="#signup">회원가입</a></p>
+        </form>
+      </section>
+
+      <section id="signup-page" class="page auth-page hidden">
+        <form id="signup-form" class="auth-card">
+          <div>
+            <p>Sign up</p>
+            <h1>회원가입</h1>
+          </div>
+          <label>
+            이메일 주소
+            <input id="signup-email" type="email" autocomplete="email" required />
+          </label>
+          <label>
+            비밀번호
+            <input id="signup-password" type="password" autocomplete="new-password" minlength="6" required />
+          </label>
+          <label>
+            비밀번호 확인
+            <input id="signup-password-confirm" type="password" autocomplete="new-password" minlength="6" required />
+          </label>
+          <label>
+            닉네임
+            <input id="signup-nickname" type="text" maxlength="40" autocomplete="nickname" required />
+          </label>
+          <p id="signup-message" class="message hidden"></p>
+          <button type="submit">회원가입</button>
+          <p class="auth-link">이미 계정이 있으신가요? <a href="#login">로그인</a></p>
+        </form>
+      </section>
+    </main>
+
+    <script src="./app.js?v=navlayout1"></script>
+  </body>
+</html>

@@ -1,0 +1,26 @@
+# Local editor and agent state
+.vscode/
+.agents/
+.codex/
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+
+# Dependency and build output
+node_modules/
+dist/
+build/
+
+# Logs and local runtime files
+*.log
+server.out.log
+server.err.log
+
+# OS metadata
+.DS_Store
+Thumbs.db
