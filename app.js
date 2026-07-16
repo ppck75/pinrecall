@@ -5,6 +5,8 @@ const SESSION_KEY = "pinrecall.supabase.session";
 
 let session = null;
 let profile = null;
+let boards = [];
+let currentBoardIndex = 0;
 let notes = [];
 let quizzes = [];
 let quizOrder = [];
@@ -18,11 +20,17 @@ const pages = {
   quiz: document.querySelector("#quiz-page"),
   login: document.querySelector("#login-page"),
   signup: document.querySelector("#signup-page"),
+  docs: document.querySelector("#docs-page"),
 };
 
 const noteBoard = document.querySelector("#note-board");
 const noteForm = document.querySelector("#note-form");
 const noteText = document.querySelector("#note-text");
+const boardTitle = document.querySelector("#board-title");
+const boardCount = document.querySelector("#board-count");
+const addBoardButton = document.querySelector("#add-board-btn");
+const prevBoardButton = document.querySelector("#prev-board-btn");
+const nextBoardButton = document.querySelector("#next-board-btn");
 const quizForm = document.querySelector("#quiz-form");
 const questionInput = document.querySelector("#question-input");
 const answerInput = document.querySelector("#answer-input");
@@ -47,6 +55,9 @@ function bindEvents() {
   window.addEventListener("hashchange", renderRoute);
   nav.addEventListener("click", navigateFromNav);
   noteForm.addEventListener("submit", addNote);
+  addBoardButton.addEventListener("click", addBoard);
+  prevBoardButton.addEventListener("click", () => moveBoard(-1));
+  nextBoardButton.addEventListener("click", () => moveBoard(1));
   quizForm.addEventListener("submit", addQuiz);
   document.querySelector("#shuffle-btn").addEventListener("click", shuffleQuiz);
   document.querySelector("#show-answer-btn").addEventListener("click", () => quizAnswer.classList.toggle("hidden"));
@@ -95,6 +106,8 @@ async function getStoredSession() {
 async function loadUserData() {
   if (!session) {
     profile = null;
+    boards = [];
+    currentBoardIndex = 0;
     notes = [];
     quizzes = [];
     quizOrder = [];
@@ -103,14 +116,21 @@ async function loadUserData() {
   }
 
   try {
-    const [profiles, noteData, quizData] = await Promise.all([
+    const [profiles, boardData, noteData, quizData] = await Promise.all([
       restRequest(`/profiles?select=nickname,email&id=eq.${session.user.id}`),
+      restRequest("/note_boards?select=*&order=position.asc,created_at.asc"),
       restRequest("/study_notes?select=*&order=created_at.asc"),
       restRequest("/quiz_cards?select=*&order=created_at.asc"),
     ]);
 
     profile = profiles[0] ?? null;
+    boards = boardData ?? [];
+    if (!boards.length) {
+      boards = [await createBoard("기본 칠판", 0)];
+    }
+    currentBoardIndex = Math.min(currentBoardIndex, Math.max(boards.length - 1, 0));
     notes = noteData ?? [];
+    await assignNotesWithoutBoard();
     quizzes = quizData ?? [];
     quizOrder = quizzes.map((_, index) => index);
     currentQuiz = 0;
@@ -118,6 +138,8 @@ async function loadUserData() {
     clearSession();
     session = null;
     profile = null;
+    boards = [];
+    currentBoardIndex = 0;
     notes = [];
     quizzes = [];
     quizOrder = [];
@@ -131,6 +153,7 @@ function renderNav() {
     nav.innerHTML = `
       <a class="${navActive("notes")}" href="#notes">포스트잇</a>
       <a class="${navActive("quiz")}" href="#quiz">퀴즈</a>
+      <a class="${navActive("docs")}" href="#docs">사용 설명서</a>
       <button id="logout-btn" type="button">로그아웃</button>
     `;
     document.querySelector("#logout-btn").addEventListener("click", logout);
@@ -141,6 +164,7 @@ function renderNav() {
   nav.innerHTML = `
     <a class="${navActive("notes")}" href="#notes">포스트잇</a>
     <a class="${navActive("quiz")}" href="#quiz">퀴즈</a>
+    <a class="${navActive("docs")}" href="#docs">사용 설명서</a>
     <a class="${navActive("login")}" href="#login">로그인</a>
     <a class="${navActive("signup")}" href="#signup">회원가입</a>
   `;
@@ -170,6 +194,11 @@ function renderRoute() {
       showMessage(loginMessage, message, false);
       sessionStorage.removeItem("signup-success");
     }
+    return;
+  }
+
+  if (route === "docs") {
+    pages.docs.classList.remove("hidden");
     return;
   }
 
@@ -252,6 +281,8 @@ function logout() {
   session = null;
   profile = null;
   notes = [];
+  boards = [];
+  currentBoardIndex = 0;
   quizzes = [];
   quizOrder = [];
   currentQuiz = 0;
@@ -263,8 +294,11 @@ async function addNote(event) {
   event.preventDefault();
   const content = noteText.value.trim();
   if (!content || !session) return;
+  const board = currentBoard();
+  if (!board) return;
 
   const nextNote = {
+    board_id: board.id,
     content,
     x: 24 + (notes.length % 4) * 32,
     y: 24 + (notes.length % 5) * 28,
@@ -287,13 +321,17 @@ async function addNote(event) {
 
 function renderNotes() {
   noteBoard.innerHTML = "";
+  renderBoardMeta();
 
-  if (!notes.length) {
+  const board = currentBoard();
+  const visibleNotes = board ? notes.filter((note) => note.board_id === board.id) : [];
+
+  if (!visibleNotes.length) {
     noteBoard.innerHTML = `<p class="empty">아직 붙인 포스트잇이 없습니다.</p>`;
     return;
   }
 
-  notes.forEach((note) => {
+  visibleNotes.forEach((note) => {
     const item = document.createElement("article");
     item.className = "note";
     item.style.left = `${note.x}px`;
@@ -309,6 +347,62 @@ function renderNotes() {
     item.addEventListener("pointerdown", startDrag);
     noteBoard.append(item);
   });
+}
+
+async function addBoard() {
+  if (!session) return;
+
+  try {
+    const board = await createBoard(`칠판 ${boards.length + 1}`, boards.length);
+    boards.push(board);
+    currentBoardIndex = boards.length - 1;
+    renderNotes();
+  } catch {
+    return;
+  }
+}
+
+async function createBoard(title, position) {
+  const data = await restRequest("/note_boards?select=*", {
+    method: "POST",
+    body: { title, position },
+    prefer: "return=representation",
+  });
+  return data[0];
+}
+
+async function assignNotesWithoutBoard() {
+  const board = currentBoard();
+  const looseNotes = notes.filter((note) => !note.board_id);
+  if (!board || !looseNotes.length) return;
+
+  await Promise.all(
+    looseNotes.map((note) =>
+      restRequest(`/study_notes?id=eq.${note.id}`, {
+        method: "PATCH",
+        body: { board_id: board.id },
+      }),
+    ),
+  );
+  notes = notes.map((note) => (note.board_id ? note : { ...note, board_id: board.id }));
+}
+
+function moveBoard(direction) {
+  if (!boards.length) return;
+  currentBoardIndex = (currentBoardIndex + direction + boards.length) % boards.length;
+  renderNotes();
+}
+
+function currentBoard() {
+  return boards[currentBoardIndex] ?? null;
+}
+
+function renderBoardMeta() {
+  const board = currentBoard();
+  boardTitle.textContent = board?.title ?? "칠판 없음";
+  boardCount.textContent = boards.length ? `${currentBoardIndex + 1} / ${boards.length}` : "0 / 0";
+  prevBoardButton.disabled = boards.length <= 1;
+  nextBoardButton.disabled = boards.length <= 1;
 }
 
 async function deleteNote(id) {
