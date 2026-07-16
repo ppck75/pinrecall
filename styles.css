@@ -347,6 +347,10 @@ label {
   font-size: clamp(1.8rem, 4vw, 3.6rem);
 }
 
+#quiz-question.empty-question {
+  font-size: clamp(0.9rem, 2vw, 1.8rem);
+}
+
 .answer {
   margin: 0;
   padding: 14px;

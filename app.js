@@ -552,6 +552,7 @@ function showCurrentQuiz() {
   if (!quizzes.length) {
     quizCount.textContent = "0 / 0";
     quizQuestion.textContent = "등록한 문제가 없습니다.";
+    quizQuestion.classList.add("empty-question");
     quizAnswer.textContent = "";
     quizAnswer.classList.add("hidden");
     return;
@@ -560,6 +561,7 @@ function showCurrentQuiz() {
   const quiz = quizzes[quizOrder[currentQuiz]];
   quizCount.textContent = `${currentQuiz + 1} / ${quizzes.length}`;
   quizQuestion.textContent = quiz.question;
+  quizQuestion.classList.remove("empty-question");
   quizAnswer.textContent = quiz.answer;
   quizAnswer.classList.add("hidden");
 }
