@@ -242,7 +242,14 @@ label {
   margin: 0 0 12px;
 }
 
-.board-title {
+.workspace-select {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.workspace-toggle {
   display: inline-flex;
   align-items: center;
   min-height: 36px;
@@ -252,6 +259,60 @@ label {
   background: #e8f4ef;
   color: var(--green);
   font-weight: 900;
+}
+
+.workspace-toggle::after {
+  margin-left: 8px;
+  content: "▾";
+  font-size: 0.78rem;
+}
+
+.workspace-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 70;
+  display: none;
+  width: min(260px, calc(100vw - 32px));
+  padding: 8px;
+  border: 1px solid rgba(34, 32, 29, 0.12);
+  border-radius: 10px;
+  background: #fffdf8;
+  box-shadow: 0 16px 36px rgba(34, 32, 29, 0.14);
+}
+
+.workspace-menu.open {
+  display: grid;
+  gap: 6px;
+}
+
+.workspace-option,
+.workspace-add {
+  justify-content: flex-start;
+  width: 100%;
+  min-height: 38px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.workspace-option:hover,
+.workspace-add:hover {
+  border-color: #e8f4ef;
+  background: #e8f4ef;
+  color: var(--green);
+}
+
+.workspace-option.active {
+  background: #0f5749;
+  color: white;
+}
+
+.workspace-add {
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 8px 8px;
+  color: var(--green);
 }
 
 .board-count {
@@ -296,11 +357,42 @@ label {
   cursor: grabbing;
 }
 
+.note.editing {
+  cursor: default;
+}
+
 .note p {
   margin: 18px 0 0;
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.55;
+}
+
+.note-editor {
+  min-height: 92px;
+  margin-top: 4px;
+  padding: 10px;
+  border-color: rgba(34, 32, 29, 0.18);
+  background: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+}
+
+.note-edit-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.note-edit-actions button {
+  min-height: 32px;
+  padding: 0 10px;
+  font-size: 0.9rem;
+}
+
+.note-edit-actions .cancel-note {
+  border-color: rgba(34, 32, 29, 0.18);
+  background: white;
+  color: var(--ink);
 }
 
 .delete {
@@ -510,6 +602,17 @@ label {
   .board-toolbar {
     align-items: stretch;
     flex-direction: column;
+  }
+
+  .workspace-select {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-menu {
+    position: static;
+    width: 100%;
+    margin-top: 8px;
   }
 
   .board-toolbar button {

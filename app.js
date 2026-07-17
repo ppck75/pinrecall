@@ -5,6 +5,8 @@ const SESSION_KEY = "pinrecall.supabase.session";
 
 let session = null;
 let profile = null;
+let workspaces = [];
+let currentWorkspaceIndex = 0;
 let boards = [];
 let currentBoardIndex = 0;
 let notes = [];
@@ -12,6 +14,7 @@ let quizzes = [];
 let quizOrder = [];
 let currentQuiz = 0;
 let dragging = null;
+let editingNoteId = null;
 
 const nav = document.querySelector("#nav");
 const menuToggle = document.querySelector("#menu-toggle");
@@ -26,7 +29,8 @@ const pages = {
 const noteBoard = document.querySelector("#note-board");
 const noteForm = document.querySelector("#note-form");
 const noteText = document.querySelector("#note-text");
-const boardTitle = document.querySelector("#board-title");
+const workspaceToggle = document.querySelector("#workspace-toggle");
+const workspaceMenu = document.querySelector("#workspace-menu");
 const boardCount = document.querySelector("#board-count");
 const addBoardButton = document.querySelector("#add-board-btn");
 const prevBoardButton = document.querySelector("#prev-board-btn");
@@ -55,8 +59,10 @@ function bindEvents() {
   window.addEventListener("hashchange", renderRoute);
   menuToggle.addEventListener("click", toggleMenu);
   nav.addEventListener("click", navigateFromNav);
-  document.addEventListener("click", closeMenuFromOutside);
-  document.addEventListener("keydown", closeMenuWithEscape);
+  workspaceToggle.addEventListener("click", toggleWorkspaceMenu);
+  workspaceMenu.addEventListener("click", handleWorkspaceMenu);
+  document.addEventListener("click", closeFloatingMenusFromOutside);
+  document.addEventListener("keydown", closeFloatingMenusWithEscape);
   noteForm.addEventListener("submit", addNote);
   addBoardButton.addEventListener("click", addBoard);
   prevBoardButton.addEventListener("click", () => moveBoard(-1));
@@ -93,14 +99,109 @@ function setMenuOpen(isOpen) {
   menuToggle.setAttribute("aria-expanded", String(isOpen));
 }
 
-function closeMenuFromOutside(event) {
-  if (event.target.closest(".menu-area")) return;
-  setMenuOpen(false);
+function toggleWorkspaceMenu() {
+  if (!session) return;
+  setWorkspaceMenuOpen(!workspaceMenu.classList.contains("open"));
 }
 
-function closeMenuWithEscape(event) {
+function setWorkspaceMenuOpen(isOpen) {
+  workspaceMenu.classList.toggle("open", isOpen);
+  workspaceToggle.setAttribute("aria-expanded", String(isOpen));
+}
+
+async function handleWorkspaceMenu(event) {
+  const addButton = event.target.closest("[data-action='add-workspace']");
+  if (addButton) {
+    await addWorkspace();
+    return;
+  }
+
+  const option = event.target.closest("[data-workspace-id]");
+  if (!option) return;
+  await selectWorkspace(option.dataset.workspaceId);
+}
+
+function renderWorkspaceMenu() {
+  if (!session) {
+    workspaceMenu.innerHTML = "";
+    setWorkspaceMenuOpen(false);
+    return;
+  }
+
+  const current = currentWorkspace();
+  const items = workspaces
+    .map(
+      (workspace) => `
+        <button
+          class="workspace-option ${workspace.id === current?.id ? "active" : ""}"
+          type="button"
+          data-workspace-id="${workspace.id}"
+        >
+          ${escapeHtml(workspace.title)}
+        </button>
+      `,
+    )
+    .join("");
+
+  workspaceMenu.innerHTML = `
+    ${items}
+    <button class="workspace-add" type="button" data-action="add-workspace">+ 작업공간 추가</button>
+  `;
+}
+
+async function selectWorkspace(id) {
+  const nextIndex = workspaces.findIndex((workspace) => workspace.id === id);
+  if (nextIndex < 0) return;
+
+  currentWorkspaceIndex = nextIndex;
+  currentBoardIndex = 0;
+  editingNoteId = null;
+  setWorkspaceMenuOpen(false);
+  await ensureCurrentWorkspaceHasBoard();
+  renderNotes();
+}
+
+async function addWorkspace() {
+  if (!session) return;
+
+  const fallbackTitle = defaultWorkspaceTitle();
+  const input = window.prompt("작업공간 이름을 입력하세요.", fallbackTitle);
+  if (input === null) return;
+
+  const title = input.trim() || fallbackTitle;
+  try {
+    const workspace = await createWorkspace(title, workspaces.length);
+    workspaces.push(workspace);
+    currentWorkspaceIndex = workspaces.length - 1;
+    currentBoardIndex = 0;
+    editingNoteId = null;
+
+    const board = await createBoard("칠판 1", 0, workspace.id);
+    boards.push(board);
+    setWorkspaceMenuOpen(false);
+    renderNotes();
+  } catch {
+    return;
+  }
+}
+
+function defaultWorkspaceTitle() {
+  return `기본칠판${workspaces.length + 1}`;
+}
+
+function closeFloatingMenusFromOutside(event) {
+  if (!event.target.closest(".menu-area")) {
+    setMenuOpen(false);
+  }
+  if (!event.target.closest(".workspace-select")) {
+    setWorkspaceMenuOpen(false);
+  }
+}
+
+function closeFloatingMenusWithEscape(event) {
   if (event.key === "Escape") {
     setMenuOpen(false);
+    setWorkspaceMenuOpen(false);
   }
 }
 
@@ -131,6 +232,8 @@ async function getStoredSession() {
 async function loadUserData() {
   if (!session) {
     profile = null;
+    workspaces = [];
+    currentWorkspaceIndex = 0;
     boards = [];
     currentBoardIndex = 0;
     notes = [];
@@ -141,19 +244,24 @@ async function loadUserData() {
   }
 
   try {
-    const [profiles, boardData, noteData, quizData] = await Promise.all([
+    const [profiles, workspaceData, boardData, noteData, quizData] = await Promise.all([
       restRequest(`/profiles?select=nickname,email&id=eq.${session.user.id}`),
+      restRequest("/note_workspaces?select=*&order=position.asc,created_at.asc"),
       restRequest("/note_boards?select=*&order=position.asc,created_at.asc"),
       restRequest("/study_notes?select=*&order=created_at.asc"),
       restRequest("/quiz_cards?select=*&order=created_at.asc"),
     ]);
 
     profile = profiles[0] ?? null;
-    boards = boardData ?? [];
-    if (!boards.length) {
-      boards = [await createBoard("기본 칠판", 0)];
+    workspaces = workspaceData ?? [];
+    if (!workspaces.length) {
+      workspaces = [await createWorkspace("기본칠판1", 0)];
     }
-    currentBoardIndex = Math.min(currentBoardIndex, Math.max(boards.length - 1, 0));
+    currentWorkspaceIndex = Math.min(currentWorkspaceIndex, Math.max(workspaces.length - 1, 0));
+    boards = boardData ?? [];
+    await assignBoardsWithoutWorkspace();
+    await ensureCurrentWorkspaceHasBoard();
+    currentBoardIndex = Math.min(currentBoardIndex, Math.max(currentBoards().length - 1, 0));
     notes = noteData ?? [];
     await assignNotesWithoutBoard();
     quizzes = quizData ?? [];
@@ -163,6 +271,8 @@ async function loadUserData() {
     clearSession();
     session = null;
     profile = null;
+    workspaces = [];
+    currentWorkspaceIndex = 0;
     boards = [];
     currentBoardIndex = 0;
     notes = [];
@@ -312,6 +422,8 @@ function logout() {
   session = null;
   profile = null;
   notes = [];
+  workspaces = [];
+  currentWorkspaceIndex = 0;
   boards = [];
   currentBoardIndex = 0;
   quizzes = [];
@@ -370,37 +482,120 @@ function renderNotes() {
     item.style.top = `${note.y}px`;
     item.style.background = note.color;
     item.dataset.id = note.id;
-    item.innerHTML = `
-      <button class="delete" type="button" aria-label="삭제">x</button>
-      <p>${escapeHtml(note.content)}</p>
-    `;
+    if (editingNoteId === note.id) {
+      item.classList.add("editing");
+      item.innerHTML = `
+        <textarea class="note-editor" maxlength="240" aria-label="포스트잇 내용 수정">${escapeHtml(note.content)}</textarea>
+        <div class="note-edit-actions">
+          <button class="save-note" type="button">저장</button>
+          <button class="cancel-note" type="button">취소</button>
+        </div>
+      `;
+      const editor = item.querySelector(".note-editor");
+      item.querySelector(".save-note").addEventListener("click", () => saveNoteEdit(note.id, editor.value));
+      item.querySelector(".cancel-note").addEventListener("click", cancelNoteEdit);
+      requestAnimationFrame(() => {
+        editor.focus();
+        editor.setSelectionRange(editor.value.length, editor.value.length);
+      });
+    } else {
+      item.innerHTML = `
+        <button class="delete" type="button" aria-label="삭제">x</button>
+        <p>${escapeHtml(note.content)}</p>
+      `;
+      item.querySelector(".delete").addEventListener("click", () => deleteNote(note.id));
+      item.addEventListener("dblclick", () => editNote(note.id));
+    }
 
-    item.querySelector(".delete").addEventListener("click", () => deleteNote(note.id));
     item.addEventListener("pointerdown", startDrag);
     noteBoard.append(item);
   });
 }
 
-async function addBoard() {
-  if (!session) return;
+function editNote(id) {
+  editingNoteId = id;
+  renderNotes();
+}
+
+function cancelNoteEdit() {
+  editingNoteId = null;
+  renderNotes();
+}
+
+async function saveNoteEdit(id, content) {
+  const nextContent = content.trim();
+  if (!nextContent) return;
 
   try {
-    const board = await createBoard(`칠판 ${boards.length + 1}`, boards.length);
-    boards.push(board);
-    currentBoardIndex = boards.length - 1;
+    await restRequest(`/study_notes?id=eq.${id}`, {
+      method: "PATCH",
+      body: { content: nextContent },
+    });
+    notes = notes.map((note) => (note.id === id ? { ...note, content: nextContent } : note));
+    editingNoteId = null;
     renderNotes();
   } catch {
     return;
   }
 }
 
-async function createBoard(title, position) {
+async function addBoard() {
+  if (!session) return;
+  const workspace = currentWorkspace();
+  if (!workspace) return;
+
+  try {
+    const workspaceBoards = currentBoards();
+    const board = await createBoard(`칠판 ${workspaceBoards.length + 1}`, workspaceBoards.length, workspace.id);
+    boards.push(board);
+    currentBoardIndex = currentBoards().length - 1;
+    renderNotes();
+  } catch {
+    return;
+  }
+}
+
+async function createBoard(title, position, workspaceId = currentWorkspace()?.id) {
   const data = await restRequest("/note_boards?select=*", {
+    method: "POST",
+    body: { title, position, workspace_id: workspaceId },
+    prefer: "return=representation",
+  });
+  return data[0];
+}
+
+async function createWorkspace(title, position) {
+  const data = await restRequest("/note_workspaces?select=*", {
     method: "POST",
     body: { title, position },
     prefer: "return=representation",
   });
   return data[0];
+}
+
+async function assignBoardsWithoutWorkspace() {
+  const workspace = currentWorkspace();
+  const looseBoards = boards.filter((board) => !board.workspace_id);
+  if (!workspace || !looseBoards.length) return;
+
+  await Promise.all(
+    looseBoards.map((board) =>
+      restRequest(`/note_boards?id=eq.${board.id}`, {
+        method: "PATCH",
+        body: { workspace_id: workspace.id },
+      }),
+    ),
+  );
+  boards = boards.map((board) => (board.workspace_id ? board : { ...board, workspace_id: workspace.id }));
+}
+
+async function ensureCurrentWorkspaceHasBoard() {
+  const workspace = currentWorkspace();
+  if (!workspace || currentBoards().length) return;
+
+  const board = await createBoard("칠판 1", 0, workspace.id);
+  boards.push(board);
+  currentBoardIndex = 0;
 }
 
 async function assignNotesWithoutBoard() {
@@ -420,21 +615,35 @@ async function assignNotesWithoutBoard() {
 }
 
 function moveBoard(direction) {
-  if (!boards.length) return;
-  currentBoardIndex = (currentBoardIndex + direction + boards.length) % boards.length;
+  const workspaceBoards = currentBoards();
+  if (!workspaceBoards.length) return;
+  currentBoardIndex = (currentBoardIndex + direction + workspaceBoards.length) % workspaceBoards.length;
   renderNotes();
 }
 
+function currentWorkspace() {
+  return workspaces[currentWorkspaceIndex] ?? null;
+}
+
+function currentBoards() {
+  const workspace = currentWorkspace();
+  if (!workspace) return [];
+  return boards.filter((board) => board.workspace_id === workspace.id);
+}
+
 function currentBoard() {
-  return boards[currentBoardIndex] ?? null;
+  return currentBoards()[currentBoardIndex] ?? null;
 }
 
 function renderBoardMeta() {
-  const board = currentBoard();
-  boardTitle.textContent = board?.title ?? "칠판 없음";
-  boardCount.textContent = boards.length ? `${currentBoardIndex + 1} / ${boards.length}` : "0 / 0";
-  prevBoardButton.disabled = boards.length <= 1;
-  nextBoardButton.disabled = boards.length <= 1;
+  const workspace = currentWorkspace();
+  const workspaceBoards = currentBoards();
+  currentBoardIndex = Math.min(currentBoardIndex, Math.max(workspaceBoards.length - 1, 0));
+  workspaceToggle.textContent = workspace?.title ?? "작업공간 없음";
+  boardCount.textContent = workspaceBoards.length ? `${currentBoardIndex + 1} / ${workspaceBoards.length}` : "0 / 0";
+  prevBoardButton.disabled = workspaceBoards.length <= 1;
+  nextBoardButton.disabled = workspaceBoards.length <= 1;
+  renderWorkspaceMenu();
 }
 
 async function deleteNote(id) {
@@ -448,7 +657,7 @@ async function deleteNote(id) {
 }
 
 function startDrag(event) {
-  if (event.target.closest("button")) return;
+  if (event.target.closest("button, textarea, input, .note-editor")) return;
 
   const note = event.currentTarget;
   const rect = note.getBoundingClientRect();
