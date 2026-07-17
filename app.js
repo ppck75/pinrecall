@@ -323,6 +323,11 @@ function renderRoute() {
   hideMessage(signupMessage);
   renderNav();
 
+  if (session && (route === "login" || route === "signup")) {
+    navigateTo("#notes");
+    return;
+  }
+
   if (route === "signup") {
     pages.signup.classList.remove("hidden");
     return;
@@ -411,10 +416,18 @@ async function login(event) {
     session = saveSession(data);
     await loadUserData();
     renderNav();
-    location.hash = "#notes";
+    navigateTo("#notes");
   } catch {
     showMessage(loginMessage, "이메일 또는 비밀번호를 확인하세요.", true);
   }
+}
+
+function navigateTo(hash) {
+  if (location.hash === hash) {
+    renderRoute();
+    return;
+  }
+  location.hash = hash;
 }
 
 function logout() {
