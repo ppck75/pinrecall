@@ -70,6 +70,7 @@ function bindEvents() {
   quizForm.addEventListener("submit", addQuiz);
   document.querySelector("#shuffle-btn").addEventListener("click", shuffleQuiz);
   document.querySelector("#show-answer-btn").addEventListener("click", () => quizAnswer.classList.toggle("hidden"));
+  document.querySelector("#prev-btn").addEventListener("click", prevQuiz);
   document.querySelector("#next-btn").addEventListener("click", nextQuiz);
   document.querySelector("#login-form").addEventListener("submit", login);
   document.querySelector("#signup-form").addEventListener("submit", signup);
@@ -794,6 +795,12 @@ function shuffleQuiz() {
     .sort((a, b) => a.sort - b.sort)
     .map((item) => item.value);
   currentQuiz = 0;
+  showCurrentQuiz();
+}
+
+function prevQuiz() {
+  if (!quizzes.length) return;
+  currentQuiz = (currentQuiz - 1 + quizzes.length) % quizzes.length;
   showCurrentQuiz();
 }
 
