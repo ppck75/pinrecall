@@ -2,6 +2,11 @@ const SUPABASE_URL = "https://qemfgfwbyjbjunkoowmj.supabase.co";
 const SUPABASE_KEY = "sb_publishable_YCobY_XD9DTkwpt9X4ihgA_MLWUT4xI";
 const NOTE_COLORS = ["#ffe66d", "#caffbf", "#9bf6ff", "#ffd6a5", "#ffadad"];
 const SESSION_KEY = "pinrecall.supabase.session";
+const QUIZ_LIST_PAGE_SIZE = 20;
+const TABLE_STORAGE_PREFIX = "pinrecall.tables";
+const TABLE_ROWS_PER_PAGE = 20;
+const DEFAULT_TABLE_COLUMNS = 2;
+const MAX_TABLE_COLUMNS = 8;
 
 let session = null;
 let profile = null;
@@ -13,6 +18,9 @@ let notes = [];
 let quizzes = [];
 let quizOrder = [];
 let currentQuiz = 0;
+let currentQuizListPage = 0;
+let tableData = createDefaultTableData();
+let currentTablePageIndex = 0;
 let dragging = null;
 let editingNoteId = null;
 
@@ -21,6 +29,7 @@ const menuToggle = document.querySelector("#menu-toggle");
 const pages = {
   notes: document.querySelector("#notes-page"),
   quiz: document.querySelector("#quiz-page"),
+  table: document.querySelector("#table-page"),
   login: document.querySelector("#login-page"),
   signup: document.querySelector("#signup-page"),
   docs: document.querySelector("#docs-page"),
@@ -42,6 +51,17 @@ const quizQuestion = document.querySelector("#quiz-question");
 const quizAnswer = document.querySelector("#quiz-answer");
 const quizCount = document.querySelector("#quiz-count");
 const quizList = document.querySelector("#quiz-list");
+const quizPagination = document.querySelector("#quiz-pagination");
+const quizPageStatus = document.querySelector("#quiz-page-status");
+const prevQuizPageButton = document.querySelector("#prev-quiz-page-btn");
+const nextQuizPageButton = document.querySelector("#next-quiz-page-btn");
+const tableGrid = document.querySelector("#table-grid");
+const tablePageStatus = document.querySelector("#table-page-status");
+const tableColumnStatus = document.querySelector("#table-column-status");
+const addTableColumnButton = document.querySelector("#add-table-column-btn");
+const addTablePageButton = document.querySelector("#add-table-page-btn");
+const prevTablePageButton = document.querySelector("#prev-table-page-btn");
+const nextTablePageButton = document.querySelector("#next-table-page-btn");
 const loginMessage = document.querySelector("#login-message");
 const signupMessage = document.querySelector("#signup-message");
 
@@ -72,6 +92,13 @@ function bindEvents() {
   document.querySelector("#show-answer-btn").addEventListener("click", () => quizAnswer.classList.toggle("hidden"));
   document.querySelector("#prev-btn").addEventListener("click", prevQuiz);
   document.querySelector("#next-btn").addEventListener("click", nextQuiz);
+  prevQuizPageButton.addEventListener("click", () => moveQuizListPage(-1));
+  nextQuizPageButton.addEventListener("click", () => moveQuizListPage(1));
+  addTableColumnButton.addEventListener("click", addTableColumn);
+  addTablePageButton.addEventListener("click", addTablePage);
+  prevTablePageButton.addEventListener("click", () => moveTablePage(-1));
+  nextTablePageButton.addEventListener("click", () => moveTablePage(1));
+  tableGrid.addEventListener("dblclick", editTableCell);
   document.querySelector("#login-form").addEventListener("submit", login);
   document.querySelector("#signup-form").addEventListener("submit", signup);
 }
@@ -241,10 +268,16 @@ async function loadUserData() {
     quizzes = [];
     quizOrder = [];
     currentQuiz = 0;
+    currentQuizListPage = 0;
+    tableData = createDefaultTableData();
+    currentTablePageIndex = 0;
     return;
   }
 
   try {
+    tableData = readTableData();
+    currentTablePageIndex = 0;
+
     const [profiles, workspaceData, boardData, noteData, quizData] = await Promise.all([
       restRequest(`/profiles?select=nickname,email&id=eq.${session.user.id}`),
       restRequest("/note_workspaces?select=*&order=position.asc,created_at.asc"),
@@ -268,6 +301,8 @@ async function loadUserData() {
     quizzes = quizData ?? [];
     quizOrder = quizzes.map((_, index) => index);
     currentQuiz = 0;
+    currentQuizListPage = 0;
+    normalizeTableData();
   } catch {
     clearSession();
     session = null;
@@ -279,6 +314,10 @@ async function loadUserData() {
     notes = [];
     quizzes = [];
     quizOrder = [];
+    currentQuiz = 0;
+    currentQuizListPage = 0;
+    tableData = createDefaultTableData();
+    currentTablePageIndex = 0;
   }
 }
 
@@ -292,6 +331,7 @@ function renderNav() {
       </div>
       <a class="${navActive("notes")}" href="#notes">포스트잇</a>
       <a class="${navActive("quiz")}" href="#quiz">퀴즈</a>
+      <a class="${navActive("table")}" href="#table">표</a>
       <a class="${navActive("docs")}" href="#docs">사용 설명서</a>
       <button id="logout-btn" type="button">로그아웃</button>
     `;
@@ -306,6 +346,7 @@ function renderNav() {
     </div>
     <a class="${navActive("notes")}" href="#notes">포스트잇</a>
     <a class="${navActive("quiz")}" href="#quiz">퀴즈</a>
+    <a class="${navActive("table")}" href="#table">표</a>
     <a class="${navActive("docs")}" href="#docs">사용 설명서</a>
     <a class="${navActive("login")}" href="#login">로그인</a>
     <a class="${navActive("signup")}" href="#signup">회원가입</a>
@@ -349,9 +390,15 @@ function renderRoute() {
     return;
   }
 
-  if ((route === "notes" || route === "quiz") && !session) {
+  if ((route === "notes" || route === "quiz" || route === "table") && !session) {
     pages.login.classList.remove("hidden");
-    showMessage(loginMessage, "로그인 후 포스트잇과 퀴즈를 사용할 수 있습니다.", false);
+    showMessage(loginMessage, "로그인 후 포스트잇, 퀴즈, 표를 사용할 수 있습니다.", false);
+    return;
+  }
+
+  if (route === "table") {
+    pages.table.classList.remove("hidden");
+    renderTable();
     return;
   }
 
@@ -443,6 +490,9 @@ function logout() {
   quizzes = [];
   quizOrder = [];
   currentQuiz = 0;
+  currentQuizListPage = 0;
+  tableData = createDefaultTableData();
+  currentTablePageIndex = 0;
   renderNav();
   setMenuOpen(false);
   location.hash = "#login";
@@ -719,6 +769,192 @@ async function endDrag(event) {
   dragging = null;
 }
 
+function createDefaultTableData() {
+  return {
+    columns: DEFAULT_TABLE_COLUMNS,
+    pages: [createTablePage()],
+  };
+}
+
+function createTablePage() {
+  const id = window.crypto?.randomUUID?.() ?? `table-page-${Date.now()}-${Math.random()}`;
+  return { id, cells: {} };
+}
+
+function tableStorageKey() {
+  return `${TABLE_STORAGE_PREFIX}.${session?.user?.id ?? "guest"}`;
+}
+
+function readTableData() {
+  try {
+    const stored = JSON.parse(localStorage.getItem(tableStorageKey()));
+    if (!stored) return createDefaultTableData();
+    tableData = stored;
+    normalizeTableData();
+    return tableData;
+  } catch {
+    return createDefaultTableData();
+  }
+}
+
+function saveTableData() {
+  if (!session) return;
+  normalizeTableData();
+  localStorage.setItem(tableStorageKey(), JSON.stringify(tableData));
+}
+
+function normalizeTableData() {
+  if (!tableData || typeof tableData !== "object") {
+    tableData = createDefaultTableData();
+  }
+
+  tableData.columns = clamp(Number.parseInt(tableData.columns, 10) || DEFAULT_TABLE_COLUMNS, DEFAULT_TABLE_COLUMNS, MAX_TABLE_COLUMNS);
+
+  if (!Array.isArray(tableData.pages) || !tableData.pages.length) {
+    tableData.pages = [createTablePage()];
+  }
+
+  tableData.pages = tableData.pages.map((page) => ({
+    id: page?.id ?? createTablePage().id,
+    cells: page?.cells && typeof page.cells === "object" ? page.cells : {},
+  }));
+  currentTablePageIndex = clamp(currentTablePageIndex, 0, tableData.pages.length - 1);
+}
+
+function currentTablePage() {
+  normalizeTableData();
+  return tableData.pages[currentTablePageIndex];
+}
+
+function renderTable() {
+  normalizeTableData();
+  const page = currentTablePage();
+  const columns = tableData.columns;
+  tableGrid.innerHTML = "";
+  tableGrid.style.gridTemplateColumns = `44px repeat(${columns}, minmax(120px, 1fr))`;
+
+  const corner = document.createElement("div");
+  corner.className = "table-corner";
+  tableGrid.append(corner);
+
+  for (let column = 0; column < columns; column += 1) {
+    const header = document.createElement("div");
+    header.className = "table-header";
+    header.textContent = tableColumnName(column);
+    tableGrid.append(header);
+  }
+
+  for (let row = 0; row < TABLE_ROWS_PER_PAGE; row += 1) {
+    const rowHeader = document.createElement("div");
+    rowHeader.className = "table-row-header";
+    rowHeader.textContent = String(row + 1);
+    tableGrid.append(rowHeader);
+
+    for (let column = 0; column < columns; column += 1) {
+      const cell = document.createElement("div");
+      cell.className = "table-cell";
+      cell.tabIndex = 0;
+      cell.dataset.row = String(row);
+      cell.dataset.column = String(column);
+      cell.textContent = page.cells[tableCellKey(row, column)] ?? "";
+      tableGrid.append(cell);
+    }
+  }
+
+  tableColumnStatus.textContent = `${columns} / ${MAX_TABLE_COLUMNS}칸`;
+  tablePageStatus.textContent = `${currentTablePageIndex + 1} / ${tableData.pages.length}`;
+  addTableColumnButton.disabled = columns >= MAX_TABLE_COLUMNS;
+  prevTablePageButton.disabled = currentTablePageIndex === 0;
+  nextTablePageButton.disabled = currentTablePageIndex >= tableData.pages.length - 1;
+}
+
+function tableColumnName(index) {
+  return String.fromCharCode(65 + index);
+}
+
+function tableCellKey(row, column) {
+  return `${row}:${column}`;
+}
+
+function addTableColumn() {
+  normalizeTableData();
+  if (tableData.columns >= MAX_TABLE_COLUMNS) return;
+  tableData.columns += 1;
+  saveTableData();
+  renderTable();
+}
+
+function addTablePage() {
+  normalizeTableData();
+  tableData.pages.push(createTablePage());
+  currentTablePageIndex = tableData.pages.length - 1;
+  saveTableData();
+  renderTable();
+}
+
+function moveTablePage(direction) {
+  normalizeTableData();
+  currentTablePageIndex = clamp(currentTablePageIndex + direction, 0, tableData.pages.length - 1);
+  renderTable();
+}
+
+function editTableCell(event) {
+  const cell = event.target.closest(".table-cell");
+  if (!cell) return;
+  if (cell.isContentEditable) return;
+
+  const original = cell.textContent;
+  cell.contentEditable = "true";
+  cell.classList.add("editing");
+  cell.focus();
+  selectElementText(cell);
+
+  const handleKeyDown = (keyEvent) => {
+    if (keyEvent.key === "Enter") {
+      keyEvent.preventDefault();
+      cell.blur();
+    }
+    if (keyEvent.key === "Escape") {
+      keyEvent.preventDefault();
+      cell.textContent = original;
+      cell.blur();
+    }
+  };
+  cell.addEventListener("keydown", handleKeyDown);
+
+  cell.addEventListener(
+    "blur",
+    () => {
+      const row = Number.parseInt(cell.dataset.row, 10);
+      const column = Number.parseInt(cell.dataset.column, 10);
+      const value = cell.textContent.replace(/\s+/g, " ").trim().slice(0, 300);
+      const page = currentTablePage();
+      const key = tableCellKey(row, column);
+
+      cell.contentEditable = "false";
+      cell.classList.remove("editing");
+      cell.removeEventListener("keydown", handleKeyDown);
+      cell.textContent = value;
+
+      if (value) {
+        page.cells[key] = value;
+      } else {
+        delete page.cells[key];
+      }
+      saveTableData();
+    },
+    { once: true },
+  );
+}
+
+function selectElementText(element) {
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
 async function addQuiz(event) {
   event.preventDefault();
   const question = questionInput.value.trim();
@@ -735,6 +971,7 @@ async function addQuiz(event) {
     quizzes.push(data[0]);
     quizOrder = quizzes.map((_, index) => index);
     currentQuiz = quizOrder.length - 1;
+    currentQuizListPage = quizListPageCount() - 1;
     questionInput.value = "";
     answerInput.value = "";
     renderQuiz();
@@ -745,8 +982,12 @@ async function addQuiz(event) {
 
 function renderQuiz() {
   quizList.innerHTML = "";
+  clampQuizListPage();
 
-  quizzes.forEach((quiz) => {
+  const start = currentQuizListPage * QUIZ_LIST_PAGE_SIZE;
+  const visibleQuizzes = quizzes.slice(start, start + QUIZ_LIST_PAGE_SIZE);
+
+  visibleQuizzes.forEach((quiz) => {
     const item = document.createElement("li");
     item.innerHTML = `
       <span><strong>${escapeHtml(quiz.question)}</strong> - ${escapeHtml(quiz.answer)}</span>
@@ -756,6 +997,7 @@ function renderQuiz() {
     quizList.append(item);
   });
 
+  renderQuizPagination();
   showCurrentQuiz();
 }
 
@@ -765,10 +1007,33 @@ async function deleteQuiz(id) {
     quizzes = quizzes.filter((quiz) => quiz.id !== id);
     quizOrder = quizzes.map((_, index) => index);
     currentQuiz = 0;
+    clampQuizListPage();
     renderQuiz();
   } catch {
     return;
   }
+}
+
+function quizListPageCount() {
+  return Math.max(Math.ceil(quizzes.length / QUIZ_LIST_PAGE_SIZE), 1);
+}
+
+function clampQuizListPage() {
+  currentQuizListPage = clamp(currentQuizListPage, 0, quizListPageCount() - 1);
+}
+
+function renderQuizPagination() {
+  const pageCount = quizListPageCount();
+  const hasMultiplePages = quizzes.length > QUIZ_LIST_PAGE_SIZE;
+  quizPagination.classList.toggle("hidden", !hasMultiplePages);
+  quizPageStatus.textContent = `${currentQuizListPage + 1} / ${pageCount}`;
+  prevQuizPageButton.disabled = currentQuizListPage === 0;
+  nextQuizPageButton.disabled = currentQuizListPage >= pageCount - 1;
+}
+
+function moveQuizListPage(direction) {
+  currentQuizListPage += direction;
+  renderQuiz();
 }
 
 function showCurrentQuiz() {

@@ -18,6 +18,7 @@
         <nav id="nav" class="menu-panel" aria-label="상단 메뉴">
           <a href="#notes">포스트잇</a>
           <a href="#quiz">퀴즈</a>
+          <a href="#table">표</a>
           <a class="nav-login" href="#login">로그인</a>
           <a href="#signup">회원가입</a>
         </nav>
@@ -82,6 +83,37 @@
         </div>
 
         <ul id="quiz-list" class="quiz-list"></ul>
+        <div id="quiz-pagination" class="quiz-pagination hidden" aria-label="퀴즈 목록 페이지 이동">
+          <button id="prev-quiz-page-btn" type="button">이전 페이지</button>
+          <span id="quiz-page-status">1 / 1</span>
+          <button id="next-quiz-page-btn" type="button">다음 페이지</button>
+        </div>
+      </section>
+
+      <section id="table-page" class="page hidden">
+        <div class="page-title table-title">
+          <div>
+            <p>Table</p>
+            <h1>20행 표에 필요한 내용을 정리하세요</h1>
+          </div>
+          <div class="table-actions">
+            <button id="add-table-column-btn" type="button">세로줄 추가</button>
+            <button id="add-table-page-btn" type="button">페이지 추가</button>
+          </div>
+        </div>
+
+        <div class="table-toolbar">
+          <span id="table-column-status">2 / 8칸</span>
+          <div class="table-pager" aria-label="표 페이지 이동">
+            <button id="prev-table-page-btn" type="button">이전</button>
+            <span id="table-page-status">1 / 1</span>
+            <button id="next-table-page-btn" type="button">다음</button>
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <div id="table-grid" class="study-table" aria-label="표"></div>
+        </div>
       </section>
 
       <section id="login-page" class="page auth-page hidden">
@@ -136,7 +168,7 @@
         <article class="docs">
           <p class="docs-kicker">Guide</p>
           <h1>📘 Pinrecall 사용 설명서</h1>
-          <p class="docs-lead">시험 준비 중 반복해서 봐야 하는 내용을 포스트잇과 퀴즈로 정리하는 학습 도구입니다.</p>
+          <p class="docs-lead">시험 준비 중 반복해서 봐야 하는 내용을 포스트잇, 퀴즈, 표로 정리하는 학습 도구입니다.</p>
 
           <h2>📝 1. 포스트잇 보드</h2>
           <p>외워야 할 단어, 오답 이유, 자주 틀리는 문법을 짧게 적어 칠판에 붙입니다. 포스트잇은 드래그해서 원하는 위치로 옮길 수 있습니다.</p>
@@ -145,10 +177,13 @@
           <p>작업공간을 토익, 학교 메모처럼 나누고 각 작업공간 안에서 <strong>칠판 추가</strong>를 눌러 칠판을 넘기며 정리합니다.</p>
 
           <h2>✅ 3. 퀴즈 카드</h2>
-          <p>문제와 정답을 등록한 뒤 정답 보기, 다음, 셔플을 사용해 단어장이나 오답노트처럼 테스트합니다.</p>
+          <p>문제와 정답을 등록한 뒤 정답 보기, 이전, 다음, 셔플을 사용해 단어장이나 오답노트처럼 테스트합니다. 추가한 퀴즈 목록은 20개 단위로 페이지가 나뉩니다.</p>
 
-          <h2>🔐 4. 계정별 저장</h2>
-          <p>로그인한 계정별로 포스트잇, 칠판, 퀴즈가 Supabase에 저장됩니다. 다른 계정의 자료와 섞이지 않습니다.</p>
+          <h2>📊 4. 표</h2>
+          <p>표는 한 페이지당 20행으로 사용할 수 있습니다. 세로줄 추가로 칸을 늘리고, 셀을 더블클릭해서 텍스트를 입력합니다. 페이지 추가, 이전, 다음 버튼으로 여러 표 페이지를 이동합니다.</p>
+
+          <h2>🔐 5. 계정별 저장</h2>
+          <p>로그인한 계정별로 포스트잇, 칠판, 퀴즈가 Supabase에 저장됩니다. 표 데이터는 현재 브라우저의 로그인 사용자별 저장소에 저장됩니다.</p>
         </article>
       </section>
     </main>

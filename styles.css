@@ -483,6 +483,126 @@ label {
   color: var(--ink);
 }
 
+.quiz-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.quiz-pagination span {
+  min-width: 56px;
+  text-align: center;
+  font-weight: 800;
+}
+
+.quiz-pagination button {
+  min-height: 36px;
+  background: white;
+  color: var(--ink);
+}
+
+.quiz-pagination button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.table-title {
+  align-items: center;
+}
+
+.table-title h1 {
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  white-space: nowrap;
+}
+
+.table-actions,
+.table-toolbar,
+.table-pager {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.table-actions {
+  justify-content: flex-end;
+  flex-wrap: wrap;
+}
+
+.table-toolbar {
+  justify-content: space-between;
+  margin: 0 0 12px;
+}
+
+.table-toolbar span {
+  color: var(--muted);
+  font-weight: 800;
+}
+
+.table-pager span {
+  min-width: 56px;
+  color: var(--ink);
+  text-align: center;
+}
+
+.table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: white;
+}
+
+.study-table {
+  display: grid;
+  min-width: 100%;
+}
+
+.table-corner,
+.table-header,
+.table-row-header,
+.table-cell {
+  min-height: 42px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.table-corner,
+.table-header,
+.table-row-header {
+  display: grid;
+  place-items: center;
+  background: #e8f4ef;
+  color: var(--green);
+  font-weight: 900;
+}
+
+.table-row-header {
+  background: #fffaf1;
+  color: var(--muted);
+}
+
+.table-cell {
+  overflow: hidden;
+  padding: 10px;
+  background: #fffdf8;
+  outline: none;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.table-cell:hover,
+.table-cell:focus,
+.table-cell.editing {
+  background: #fff6d6;
+  box-shadow: inset 0 0 0 2px rgba(23, 107, 91, 0.32);
+}
+
+.table-cell.editing {
+  overflow: visible;
+  white-space: normal;
+}
+
 .auth-page {
   display: grid;
   place-items: start center;
@@ -599,6 +719,10 @@ label {
     white-space: normal;
   }
 
+  .table-title h1 {
+    white-space: normal;
+  }
+
   .board-toolbar {
     align-items: stretch;
     flex-direction: column;
@@ -616,6 +740,18 @@ label {
   }
 
   .board-toolbar button {
+    width: 100%;
+  }
+
+  .table-actions,
+  .table-toolbar,
+  .table-pager {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-actions button,
+  .table-pager button {
     width: 100%;
   }
 }
